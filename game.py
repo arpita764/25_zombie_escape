@@ -39,6 +39,31 @@ class Zombie:
         for ex in [draw_rect.x+6, draw_rect.x+18]:
             pygame.draw.circle(screen, (200,40,40), (ex, draw_rect.y+10), 4)
 
+class Barrel:
+    def __init__(self, x, y):
+        self.rect = pygame.Rect(x, y, 28, 32)
+
+    def draw(self, screen):
+        pygame.draw.rect(
+            screen,
+            (150, 80, 30),
+            self.rect,
+            border_radius=4
+        )
+        pygame.draw.rect(
+            screen,
+            (220, 180, 60),
+            self.rect,
+            3,
+            border_radius=4
+        )
+        pygame.draw.line(
+            screen,
+            (220, 180, 60),
+            (self.rect.x + 4, self.rect.centery),
+            (self.rect.right - 4, self.rect.centery),
+            3
+        )
 
 def spawn_zombie(width, height, player_rect, margin=120):
     while True:
@@ -48,8 +73,24 @@ def spawn_zombie(width, height, player_rect, margin=120):
         if not rect.colliderect(player_rect.inflate(margin, margin)):
             return Zombie(x, y)
 
+def spawn_barrel(width, height, player_rect, existing_barrels):
+    while True:
+        x = random.randint(0, width - 28)
+        y = random.randint(50, height - 32)
 
+        rect = pygame.Rect(x, y, 28, 32)
+
+        if rect.colliderect(player_rect.inflate(100, 100)):
+            continue
+
+        if any(rect.colliderect(barrel.rect.inflate(20, 20))
+               for barrel in existing_barrels):
+            continue
+
+        return Barrel(x, y)
+    
 SPEED = 4
+
 
 
 class Player:
@@ -126,6 +167,13 @@ class GameEngine:
     def reset(self):
         self.player = Player(WIDTH//2, HEIGHT//2)
         self.zombies = [spawn_zombie(WIDTH, HEIGHT, self.player.rect) for _ in range(4)]
+
+        self.barrels = []
+        for _ in range(4):
+            self.barrels.append(
+                spawn_barrel(WIDTH, HEIGHT, self.player.rect, self.barrels)
+            )
+
         self.hp = 3
         self.invincible_until = 0
         self.score = 0
@@ -162,7 +210,40 @@ class GameEngine:
 
                     if self.hp <= 0:
                         self.game_over = True
+        # Check bullet-barrel collisions
+        exploded_barrels = []
+        explosion_radius = 90
 
+        for barrel in self.barrels:
+            for b in self.player.bullets[:]:
+                bx, by = int(b[0]), int(b[1])
+
+                if barrel.rect.collidepoint(bx, by):
+                    exploded_barrels.append(barrel)
+
+                    if b in self.player.bullets:
+                        self.player.bullets.remove(b)
+
+                    barrel_x, barrel_y = barrel.rect.center
+
+                    for z in self.zombies[:]:
+                        zombie_x, zombie_y = z.rect.center
+                        distance = math.sqrt(
+                            (zombie_x - barrel_x) ** 2 +
+                            (zombie_y - barrel_y) ** 2
+                        )
+
+                        if distance <= explosion_radius:
+                            self.zombies.remove(z)
+                            self.kills += 1
+                            self.score += 10
+
+                    break
+
+        for barrel in exploded_barrels:
+            if barrel in self.barrels:
+                self.barrels.remove(barrel)
+        
         dead = []
         for z in self.zombies:
             for b in self.player.bullets[:]:
@@ -191,7 +272,12 @@ class GameEngine:
             pygame.draw.line(self.screen, (40,45,35), (x,0), (x,HEIGHT), 1)
         for y in range(0, HEIGHT, 60):
             pygame.draw.line(self.screen, (40,45,35), (0,y), (WIDTH,y), 1)
-        for z in self.zombies: z.draw(self.screen)
+        for barrel in self.barrels:
+            barrel.draw(self.screen)
+
+        for z in self.zombies:
+            z.draw(self.screen)
+
         self.player.draw(self.screen)
         hud_bg = pygame.Rect(0, 0, WIDTH, 40)
         pygame.draw.rect(self.screen, (15,20,15), hud_bg)
