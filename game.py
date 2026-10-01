@@ -110,6 +110,8 @@ class GameEngine:
     def reset(self):
         self.player = Player(WIDTH//2, HEIGHT//2)
         self.zombies = [spawn_zombie(WIDTH, HEIGHT, self.player.rect) for _ in range(4)]
+        self.hp = 3
+        self.invincible_until = 0
         self.score = 0
         self.wave = 1
         self.kills = 0
@@ -135,7 +137,14 @@ class GameEngine:
         for z in self.zombies:
             z.update(self.player.rect.center)
             if z.rect.colliderect(self.player.rect):
-                self.game_over = True
+                current_time = time.time()
+
+                if current_time >= self.invincible_until:
+                    self.hp -= 1
+                    self.invincible_until = current_time + 1.0
+
+                    if self.hp <= 0:
+                        self.game_over = True
 
         dead = []
         for z in self.zombies:
@@ -170,7 +179,7 @@ class GameEngine:
         hud_bg = pygame.Rect(0, 0, WIDTH, 40)
         pygame.draw.rect(self.screen, (15,20,15), hud_bg)
         hud = self.font.render(
-            f"Wave: {self.wave}  Score: {self.score}  Kills: {self.kills}/{self.kills_to_next}  |  WASD Move, Click Shoot, R Restart",
+            f"HP: {self.hp}  Wave: {self.wave}  Score: {self.score}  Kills: {self.kills}/{self.kills_to_next}  |  WASD Move, Click Shoot, R Restart",
             True, (160,220,120))
         self.screen.blit(hud, (8, 8))
         if self.game_over:
