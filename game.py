@@ -58,6 +58,8 @@ class Player:
         self.color = (60,160,220)
         self.bullets = []
         self.shoot_cooldown = 0
+        self.ammo = 12
+        self.reload_start = None
 
     def move(self, keys, width, height):
         dx = dy = 0
@@ -71,7 +73,12 @@ class Player:
             self.shoot_cooldown -= 1
 
     def shoot(self, target_pos):
-        if self.shoot_cooldown > 0: return
+        if self.shoot_cooldown > 0:
+            return
+        if self.reload_start is not None:
+            return
+        if self.ammo <= 0:
+            return
         cx, cy = self.rect.center
         tx, ty = target_pos
         dx, dy = tx-cx, ty-cy
@@ -81,7 +88,16 @@ class Player:
         self.bullets.append(pygame.Rect(cx-4, cy-4, 8, 8))
         self.bullets.append([cx-4, cy-4, vx, vy])
         self.bullets.pop(-2)
+        self.ammo -= 1
+        if self.ammo == 0:
+            self.reload_start = time.time()
         self.shoot_cooldown = 15
+        
+    def update_reload(self):
+        if self.reload_start is not None:
+            if time.time() - self.reload_start >= 2.0:
+                self.ammo = 12
+                self.reload_start = None
 
     def update_bullets(self, width, height):
         live = []
@@ -131,6 +147,7 @@ class GameEngine:
         if self.game_over: return
         keys = pygame.key.get_pressed()
         self.player.move(keys, WIDTH, HEIGHT)
+        self.player.update_reload()
         self.player.update_bullets(WIDTH, HEIGHT)
         self.score = int(time.time() - self.start_time)
 
@@ -179,7 +196,7 @@ class GameEngine:
         hud_bg = pygame.Rect(0, 0, WIDTH, 40)
         pygame.draw.rect(self.screen, (15,20,15), hud_bg)
         hud = self.font.render(
-            f"HP: {self.hp}  Wave: {self.wave}  Score: {self.score}  Kills: {self.kills}/{self.kills_to_next}  |  WASD Move, Click Shoot, R Restart",
+            f"HP: {self.hp}  Ammo: {self.player.ammo}/12  Wave: {self.wave}  Score: {self.score}  Kills: {self.kills}/{self.kills_to_next}  |  WASD Move, Click Shoot, R Restart",
             True, (160,220,120))
         self.screen.blit(hud, (8, 8))
         if self.game_over:
