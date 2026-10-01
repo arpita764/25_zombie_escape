@@ -101,6 +101,44 @@ class Barrel:
             3
         )
 
+class Explosion:
+    def __init__(self, x, y, radius=90):
+        self.x = x
+        self.y = y
+        self.radius = radius
+        self.max_radius = radius
+        self.duration = 0.35
+        self.start_time = time.time()
+
+    def update(self):
+        elapsed = time.time() - self.start_time
+        return elapsed < self.duration
+
+    def draw(self, screen):
+        elapsed = time.time() - self.start_time
+        progress = min(elapsed / self.duration, 1.0)
+
+        current_radius = int(self.max_radius * progress)
+
+        # Outer explosion ring
+        pygame.draw.circle(
+            screen,
+            (255, 120, 20),
+            (self.x, self.y),
+            current_radius,
+            5
+        )
+
+        # Inner explosion
+        inner_radius = max(5, int(current_radius * 0.55))
+
+        pygame.draw.circle(
+            screen,
+            (255, 210, 60),
+            (self.x, self.y),
+            inner_radius
+        )
+
 def spawn_zombie(width, height, player_rect, zombie_class=Zombie, margin=120):
     size = zombie_class.SIZE
 
@@ -224,7 +262,8 @@ class GameEngine:
             self.barrels.append(
                 spawn_barrel(WIDTH, HEIGHT, self.player.rect, self.barrels)
             )
-
+        self.explosions = []
+        
         self.hp = 3
         self.invincible_until = 0
         self.score = 0
@@ -272,10 +311,14 @@ class GameEngine:
                 if barrel.rect.collidepoint(bx, by):
                     exploded_barrels.append(barrel)
 
+                    # Create visual explosion
+                    barrel_x, barrel_y = barrel.rect.center
+                    self.explosions.append(
+                        Explosion(barrel_x, barrel_y, explosion_radius)
+                    )
+
                     if b in self.player.bullets:
                         self.player.bullets.remove(b)
-
-                    barrel_x, barrel_y = barrel.rect.center
 
                     for z in self.zombies[:]:
                         zombie_x, zombie_y = z.rect.center
@@ -294,6 +337,13 @@ class GameEngine:
         for barrel in exploded_barrels:
             if barrel in self.barrels:
                 self.barrels.remove(barrel)
+        
+        # Update active explosions
+        self.explosions = [
+            explosion
+            for explosion in self.explosions
+            if explosion.update()
+        ] 
         
         dead = []
         for z in self.zombies:
@@ -335,6 +385,9 @@ class GameEngine:
             pygame.draw.line(self.screen, (40,45,35), (0,y), (WIDTH,y), 1)
         for barrel in self.barrels:
             barrel.draw(self.screen)
+
+        for explosion in self.explosions:
+            explosion.draw(self.screen)
 
         for z in self.zombies:
             z.draw(self.screen)
